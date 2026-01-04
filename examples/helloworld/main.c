@@ -33,12 +33,15 @@ main(int argc, char **argv)
 	int ret;
 	unsigned lcore_id;
 
+	// 初始化环境抽象层（ the Environment Abstraction Layer (EAL). ）
 	ret = rte_eal_init(argc, argv);
 	if (ret < 0)
 		rte_panic("Cannot init EAL\n");
 	/* >8 End of initialization of Environment Abstraction Layer */
 
 	/* Launches the function on each lcore. 8< */
+	// 遍历每个worker核心，并在worker核心上启动lcore_hello函数
+	// 等价于rte_eal_mp_remote_launch(lcore_hello, NULL, CALL_MAIN);//在main核心上也调用
 	RTE_LCORE_FOREACH_WORKER(lcore_id) {
 		/* Simpler equivalent. 8< */
 		rte_eal_remote_launch(lcore_hello, NULL, lcore_id);

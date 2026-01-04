@@ -12,13 +12,14 @@
 int
 eal_thread_wake_worker(unsigned int worker_id)
 {
-	int m2w = lcore_config[worker_id].pipe_main2worker[1];
-	int w2m = lcore_config[worker_id].pipe_worker2main[0];
+	// 通过管道发送唤醒信息
+	int m2w = lcore_config[worker_id].pipe_main2worker[1];// main发送信息唤醒worker, worker在eal_thread_loop中不断循环读（通过eal_thread_wait_command）
+	int w2m = lcore_config[worker_id].pipe_worker2main[0];// worker发送信息唤醒main
 	char c = 0;
 	int n;
 
 	do {
-		n = write(m2w, &c, 1);
+		n = write(m2w, &c, 1);// main发送一个字节，唤醒worker
 	} while (n == 0 || (n < 0 && errno == EINTR));
 	if (n < 0)
 		return -EPIPE;

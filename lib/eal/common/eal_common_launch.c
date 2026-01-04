@@ -30,6 +30,7 @@ rte_eal_wait_lcore(unsigned worker_id)
  * function f with argument arg. Once the execution is done, the
  * remote lcore switches to WAIT state.
  */
+// 只有main核心才能调用此函数
 int
 rte_eal_remote_launch(lcore_function_t *f, void *arg, unsigned int worker_id)
 {
@@ -38,17 +39,21 @@ rte_eal_remote_launch(lcore_function_t *f, void *arg, unsigned int worker_id)
 	/* Check if the worker is in 'WAIT' state. Use acquire order
 	 * since 'state' variable is used as the guard variable.
 	 */
+	// 原子变量，检查当前cpu核心是否为WAIT状态，不是的话直接结束
 	if (rte_atomic_load_explicit(&lcore_config[worker_id].state,
 			rte_memory_order_acquire) != WAIT)
 		goto finish;
 
+	// 给worker函数设置参数
 	lcore_config[worker_id].arg = arg;
 	/* Ensure that all the memory operations are completed
 	 * before the worker thread starts running the function.
 	 * Use worker thread function as the guard variable.
 	 */
+	// 设置函数指针 for the worker core，并使用release内存顺序保证之前的内存操作完成
 	rte_atomic_store_explicit(&lcore_config[worker_id].f, f, rte_memory_order_release);
 
+	// 唤醒worker线程，开始执行函数
 	rc = eal_thread_wake_worker(worker_id);
 
 finish:
@@ -61,6 +66,7 @@ finish:
  * rte_eal_remote_launch() for all of them. If call_main is true
  * (set to CALL_MAIN), also call the function on the main lcore.
  */
+ // 用此函数可以在main上，方便地在所有worker核心上启动函数f，并可选择是否在main核心上是否也启动该函数
 int
 rte_eal_mp_remote_launch(int (*f)(void *), void *arg,
 			 enum rte_rmt_call_main_t call_main)
@@ -100,6 +106,7 @@ rte_eal_get_lcore_state(unsigned lcore_id)
  * Do a rte_eal_wait_lcore() for every lcore. The return values are
  * ignored.
  */
+// main核心，等待所有worker核心完成任务
 void
 rte_eal_mp_wait_lcore(void)
 {

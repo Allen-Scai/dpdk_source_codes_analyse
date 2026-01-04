@@ -172,8 +172,10 @@ eal_thread_loop(void *arg)
 	char cpuset[RTE_CPU_AFFINITY_STR_LEN];
 	int ret;
 
+	// 初始化worker核心上的worker线程
 	__rte_thread_init(lcore_id, &lcore_config[lcore_id].cpuset);
 
+	// 设置cpu亲和性
 	ret = eal_thread_dump_current_affinity(cpuset, sizeof(cpuset));
 	EAL_LOG(DEBUG, "lcore %u is ready (tid=%zx;cpuset=[%s%s])",
 		lcore_id, rte_thread_self().opaque_id, cpuset,
@@ -201,6 +203,7 @@ eal_thread_loop(void *arg)
 		 * are accessed only after update to 'f' is visible.
 		 * Wait till the update to 'f' is visible to the worker.
 		 */
+		// 等待函数指针被设置
 		while ((f = rte_atomic_load_explicit(&lcore_config[lcore_id].f,
 				rte_memory_order_acquire)) == NULL)
 			rte_pause();
@@ -209,7 +212,9 @@ eal_thread_loop(void *arg)
 
 		/* call the function and store the return value */
 		fct_arg = lcore_config[lcore_id].arg;
+		// 执行函数
 		ret = f(fct_arg);
+		// 保存返回值并清理函数信息
 		lcore_config[lcore_id].ret = ret;
 		lcore_config[lcore_id].f = NULL;
 		lcore_config[lcore_id].arg = NULL;
@@ -219,6 +224,7 @@ eal_thread_loop(void *arg)
 		 * are completed before the state is updated.
 		 * Use 'state' as the guard variable.
 		 */
+		// 状态重新设置为WAIT，等待下一个任务
 		rte_atomic_store_explicit(&lcore_config[lcore_id].state, WAIT,
 			rte_memory_order_release);
 

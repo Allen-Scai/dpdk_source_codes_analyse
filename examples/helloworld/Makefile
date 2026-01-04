@@ -10,14 +10,17 @@ SRCS-y := main.c
 PKGCONF ?= pkg-config
 
 # Build using pkg-config variables if possible
+# 用pkg-config工具查找一下是否能找到libdpdk（dpdk的静态或者动态库）
 ifneq ($(shell $(PKGCONF) --exists libdpdk && echo 0),0)
 $(error "no installation of DPDK found")
 endif
 
 all: shared
 .PHONY: shared static
+# 默认编译动态链接版本
 shared: build/$(APP)-shared
 	ln -sf $(APP)-shared build/$(APP)
+# 编译静态链接版本
 static: build/$(APP)-static
 	ln -sf $(APP)-static build/$(APP)
 
@@ -34,6 +37,7 @@ $(error "Cannot generate statically-linked binaries with this version of pkg-con
 endif
 endif
 
+# DPDK有些实验性质的功能，需要定义宏ALLOW_EXPERIMENTAL_API才能启用
 CFLAGS += -DALLOW_EXPERIMENTAL_API
 
 build/$(APP)-shared: $(SRCS-y) Makefile $(PC_FILE) | build
