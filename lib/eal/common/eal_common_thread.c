@@ -168,71 +168,148 @@ __rte_thread_uninit(void)
 __rte_noreturn uint32_t
 eal_thread_loop(void *arg)
 {
-	unsigned int lcore_id = (uintptr_t)arg;
-	char cpuset[RTE_CPU_AFFINITY_STR_LEN];
-	int ret;
+    // ========================================
+    // 1. 参数解析和初始化
+    // ========================================
+    // 参数 arg 传递的是逻辑核心ID（lcore_id）
+    // 使用 uintptr_t 进行类型转换，避免指针截断问题
+    unsigned int lcore_id = (uintptr_t)arg;
+    
+    // CPU 亲和性字符串缓冲区
+    char cpuset[RTE_CPU_AFFINITY_STR_LEN];
+    int ret;
 
-	// 初始化worker核心上的worker线程
-	__rte_thread_init(lcore_id, &lcore_config[lcore_id].cpuset);
+    // ========================================
+    // 2. 线程初始化
+    // ========================================
+    // 初始化线程的 TLS（线程本地存储）
+    // 设置线程的 CPU 亲和性掩码
+    __rte_thread_init(lcore_id, &lcore_config[lcore_id].cpuset);
 
-	// 设置cpu亲和性
-	ret = eal_thread_dump_current_affinity(cpuset, sizeof(cpuset));
-	EAL_LOG(DEBUG, "lcore %u is ready (tid=%zx;cpuset=[%s%s])",
-		lcore_id, rte_thread_self().opaque_id, cpuset,
-		ret == 0 ? "" : "...");
+    // ========================================
+    // 3. 设置并记录 CPU 亲和性
+    // ========================================
+    // 获取当前线程的 CPU 亲和性设置，并格式化为字符串
+    ret = eal_thread_dump_current_affinity(cpuset, sizeof(cpuset));
+    
+    // 记录日志：线程已准备就绪
+    // tid: 线程ID
+    // cpuset: CPU 亲和性设置（哪些CPU核心可以运行此线程）
+    EAL_LOG(DEBUG, "lcore %u is ready (tid=%zx;cpuset=[%s%s])",
+        lcore_id, rte_thread_self().opaque_id, cpuset,
+        ret == 0 ? "" : "...");
 
-	rte_eal_trace_thread_lcore_ready(lcore_id, cpuset);
+    // ========================================
+    // 4. 发送跟踪事件
+    // ========================================
+    // 用于性能分析和调试，记录线程已准备就绪的事件
+    rte_eal_trace_thread_lcore_ready(lcore_id, cpuset);
 
-	/* read on our pipe to get commands */
-	while (1) {
-		lcore_function_t *f;
-		void *fct_arg;
+    /* read on our pipe to get commands */
+    // ========================================
+    // 5. 主命令循环
+    // ========================================
+    while (1) {
+        lcore_function_t *f;  // 要执行的函数指针
+        void *fct_arg;        // 函数参数
 
-		eal_thread_wait_command();
+        // ========================================
+        // 5.1 等待主线程的命令
+        // ========================================
+        // 这个函数会阻塞，直到主线程通过管道发送命令
+        // 内部实现：从 pipe_main2worker[0] 读取数据
+        // 对应主线程的 eal_thread_wake_worker() 写入
+        eal_thread_wait_command();
 
-		/* Set the state to 'RUNNING'. Use release order
-		 * since 'state' variable is used as the guard variable.
-		 */
-		rte_atomic_store_explicit(&lcore_config[lcore_id].state, RUNNING,
-			rte_memory_order_release);
+        // ========================================
+        // 5.2 设置线程状态为 RUNNING
+        // ========================================
+        /* Set the state to 'RUNNING'. Use release order
+         * since 'state' variable is used as the guard variable.
+         */
+        // 使用 release 内存序：
+        // - 确保之前的所有内存操作在这个存储操作之前完成
+        // - 对于其他线程（主线程）来说，当他们看到 state==RUNNING 时，
+        //   也能看到线程之前的所有内存写入
+        rte_atomic_store_explicit(&lcore_config[lcore_id].state, RUNNING,
+            rte_memory_order_release);
 
-		eal_thread_ack_command();
+        // ========================================
+        // 5.3 确认收到命令
+        // ========================================
+        // 通过管道向主线程发送确认
+        // 内部实现：向 pipe_worker2main[1] 写入数据
+        // 对应主线程在 eal_thread_wake_worker() 中读取
+        eal_thread_ack_command();
 
-		/* Load 'f' with acquire order to ensure that
-		 * the memory operations from the main thread
-		 * are accessed only after update to 'f' is visible.
-		 * Wait till the update to 'f' is visible to the worker.
-		 */
-		// 等待函数指针被设置
-		while ((f = rte_atomic_load_explicit(&lcore_config[lcore_id].f,
-				rte_memory_order_acquire)) == NULL)
-			rte_pause();
+        // ========================================
+        // 5.4 等待函数指针被设置
+        // ========================================
+        /* Load 'f' with acquire order to ensure that
+         * the memory operations from the main thread
+         * are accessed only after update to 'f' is visible.
+         * Wait till the update to 'f' is visible to the worker.
+         */
+        // 使用 acquire 内存序：
+        // - 确保在这个加载操作之后的所有内存操作，不会重排序到加载之前
+        // - 当看到 f != NULL 时，也能看到主线程在设置 f 之前的所有内存写入
+        while ((f = rte_atomic_load_explicit(&lcore_config[lcore_id].f,
+                rte_memory_order_acquire)) == NULL)
+            rte_pause();  // 轻度 CPU 自旋等待，节能
 
-		rte_eal_trace_thread_lcore_running(lcore_id, f);
+        // ========================================
+        // 5.5 发送线程运行跟踪事件
+        // ========================================
+        rte_eal_trace_thread_lcore_running(lcore_id, f);
 
-		/* call the function and store the return value */
-		fct_arg = lcore_config[lcore_id].arg;
-		// 执行函数
-		ret = f(fct_arg);
-		// 保存返回值并清理函数信息
-		lcore_config[lcore_id].ret = ret;
-		lcore_config[lcore_id].f = NULL;
-		lcore_config[lcore_id].arg = NULL;
+        // ========================================
+        // 5.6 获取函数参数并执行函数
+        // ========================================
+        // 获取函数参数（这里不需要原子操作，因为 f 已经可见）
+        fct_arg = lcore_config[lcore_id].arg;
+        
+        // 执行主线程指定的函数
+        // 这是工作线程的核心任务，可能包括：
+        // - 数据包处理
+        // - 定时器处理
+        // - 其他自定义任务
+        ret = f(fct_arg);
+        
+        // ========================================
+        // 5.7 保存返回值和清理
+        // ========================================
+        // 保存函数返回值，供主线程查询
+        lcore_config[lcore_id].ret = ret;
+        
+        // 清理函数指针和参数，准备接收下一个任务
+        lcore_config[lcore_id].f = NULL;
+        lcore_config[lcore_id].arg = NULL;
 
-		/* Store the state with release order to ensure that
-		 * the memory operations from the worker thread
-		 * are completed before the state is updated.
-		 * Use 'state' as the guard variable.
-		 */
-		// 状态重新设置为WAIT，等待下一个任务
-		rte_atomic_store_explicit(&lcore_config[lcore_id].state, WAIT,
-			rte_memory_order_release);
+        // ========================================
+        // 5.8 设置线程状态为 WAIT
+        // ========================================
+        /* Store the state with release order to ensure that
+         * the memory operations from the worker thread
+         * are completed before the state is updated.
+         * Use 'state' as the guard variable.
+         */
+        // 使用 release 内存序：
+        // - 确保工作线程的所有内存操作在状态更新前完成
+        // - 当主线程看到 state==WAIT 时，也能看到工作线程的所有内存写入
+        //   特别是 lcore_config[lcore_id].ret 的写入
+        rte_atomic_store_explicit(&lcore_config[lcore_id].state, WAIT,
+            rte_memory_order_release);
 
-		rte_eal_trace_thread_lcore_stopped(lcore_id);
-	}
+        // ========================================
+        // 5.9 发送线程停止跟踪事件
+        // ========================================
+        rte_eal_trace_thread_lcore_stopped(lcore_id);
+        
+        // 循环回到开头，等待下一个命令
+    }
 
-	/* never reached */
-	/* return 0; */
+    /* never reached */
+    /* return 0; */
 }
 
 enum __rte_ctrl_thread_status {
