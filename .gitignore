@@ -46,8 +46,13 @@ TAGS
 dts/output
 
 # ignore default build directory, and directories from test-meson-builds.sh
-build
+*/build
 build-*
 # ignore other build directory patterns
 *-gcc*
 *-clang*
+
+# ignore temparary files
+*.o
+*.a
+*.so
