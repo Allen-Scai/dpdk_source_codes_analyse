@@ -46,7 +46,8 @@ TAGS
 dts/output
 
 # ignore default build directory, and directories from test-meson-builds.sh
-
+/build/
+/.vscode/
 
 # ignore other build directory patterns
 *-gcc*
