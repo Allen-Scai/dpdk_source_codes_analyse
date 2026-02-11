@@ -1,0 +1,29 @@
+# .clang-format
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 200
+
+# 关键配置：混合大括号风格
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: false
+  BeforeElse: false
+  BeforeCatch: false
+  AfterFunction: true
+  AfterClass: true
+  AfterStruct: true
+  AfterEnum: true
+  AfterNamespace: true
+  AfterExternBlock: true
+  BeforeWhile: false
+  SplitEmptyFunction: true     # 空函数单行
+  
+# 关键修改：允许短函数单行
+AllowShortFunctionsOnASingleLine: Inline  # 或 All
+AllowShortBlocksOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+# 其他配置保持不变...
