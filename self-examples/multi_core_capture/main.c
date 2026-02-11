@@ -100,6 +100,7 @@ static int worker_loop(void *arg)
             struct rte_mbuf *bufs[BURST_SIZE];
             uint16_t nb_rx = rte_eth_rx_burst(port, qid, bufs, BURST_SIZE);
             for (uint16_t i = 0; i < nb_rx; i++) {
+                printf("Port %u, Queue %u, rx one packet\n", port, qid);
                 inspect_packet(bufs[i]);
                 rte_pktmbuf_free(bufs[i]);
             }
