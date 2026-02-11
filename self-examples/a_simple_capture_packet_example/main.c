@@ -43,7 +43,8 @@ static uint64_t total_packets = 0;
 static uint64_t total_bytes = 0;
 
 // 信号处理函数
-static void signal_handler(int signum) {
+static void signal_handler(int signum)
+{
     // SIGINT: Ctrl + C
     // SIGTERM: kill命令
     if (signum == SIGINT || signum == SIGTERM) {
@@ -53,7 +54,8 @@ static void signal_handler(int signum) {
 }
 
 // 初始化时间戳系统
-static int init_timestamp_system(void) {
+static int init_timestamp_system(void)
+{
     // 获取TSC频率
     tsc_hz = rte_get_tsc_hz();
     if (tsc_hz == 0) {
@@ -74,7 +76,8 @@ static int init_timestamp_system(void) {
 }
 
 // 高性能时间戳获取函数
-static void get_packet_timestamp(uint64_t *tsc_cycles, uint64_t *wall_time_ns) {
+static void get_packet_timestamp(uint64_t *tsc_cycles, uint64_t *wall_time_ns)
+{
     // 获取TSC周期数（最高性能）
     *tsc_cycles = rte_rdtsc();
 
@@ -100,7 +103,8 @@ static void get_packet_timestamp(uint64_t *tsc_cycles, uint64_t *wall_time_ns) {
 }
 
 // 修改后的端口初始化函数 (关键修改点)
-static int init_port(uint16_t port, struct rte_mempool *mbuf_pool) {
+static int init_port(uint16_t port, struct rte_mempool *mbuf_pool)
+{
     // 注意：使用局部变量，以便根据设备信息修改配置
     struct rte_eth_conf port_conf = {
         .rxmode =
@@ -202,7 +206,8 @@ static int init_port(uint16_t port, struct rte_mempool *mbuf_pool) {
 }
 
 // 简化的数据包处理函数
-static void process_packet(struct rte_mbuf *pkt) {
+static void process_packet(struct rte_mbuf *pkt)
+{
     // 1.从rte_mbuf结构中获取ethernet头
     struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 
@@ -263,14 +268,16 @@ static void process_packet(struct rte_mbuf *pkt) {
 }
 
 // 主抓包循环
-static void capture_loop(void) {
+static void capture_loop(void)
+{
     uint16_t port;
 
     printf("\nStarting packet capture on %u ports. Input [Ctrl+C to quit], current lcore %u\n", rte_eth_dev_count_avail(), rte_lcore_id());
 
     while (!force_quit) {
         // 遍历所有端口
-        RTE_ETH_FOREACH_DEV(port) {
+        RTE_ETH_FOREACH_DEV(port)
+        {
             struct rte_mbuf *bufs[BURST_SIZE];
 
             // 批量接收数据包
@@ -288,7 +295,8 @@ static void capture_loop(void) {
 }
 
 // 打印最终统计
-static void print_final_stats(void) {
+static void print_final_stats(void)
+{
     printf("\n=== Final Statistics ===\n");
     printf("Total packets captured: %" PRIu64 "\n", total_packets);
     printf("Total bytes captured: %" PRIu64 "\n", total_bytes);
@@ -299,7 +307,8 @@ static void print_final_stats(void) {
 }
 
 // 主函数
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     int ret;
     uint16_t nb_ports;
     uint16_t portid;
@@ -331,7 +340,8 @@ int main(int argc, char *argv[]) {
         rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 
     // 4. 初始化所有端口 (RX、TX队列都需要初始化)
-    RTE_ETH_FOREACH_DEV(portid) {
+    RTE_ETH_FOREACH_DEV(portid)
+    {
         if (init_port(portid, mbuf_pool) != 0)
             rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n", portid);
     }
@@ -342,7 +352,8 @@ int main(int argc, char *argv[]) {
     // 6. 清理工作
     printf("\n Try to shutdown all ports ......\n");
 
-    RTE_ETH_FOREACH_DEV(portid) {
+    RTE_ETH_FOREACH_DEV(portid)
+    {
         printf("Closing port %u...", portid);
         rte_eth_dev_stop(portid);
         rte_eth_dev_close(portid);

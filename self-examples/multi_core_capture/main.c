@@ -23,16 +23,19 @@
 
 static volatile bool force_quit = false;
 
-static void handle_signal(int sig) {
+static void handle_signal(int sig)
+{
     if (sig == SIGINT || sig == SIGTERM)
         force_quit = true;
 }
 
-static void print_ether_type(uint16_t ether_type) {
+static void print_ether_type(uint16_t ether_type)
+{
     printf("EtherType: 0x%04x\n", ether_type);
 }
 
-static void print_ipv4_info(const struct rte_ipv4_hdr *ipv4) {
+static void print_ipv4_info(const struct rte_ipv4_hdr *ipv4)
+{
     char src[INET_ADDRSTRLEN] = {0};
     char dst[INET_ADDRSTRLEN] = {0};
     inet_ntop(AF_INET, &ipv4->src_addr, src, sizeof(src));
@@ -40,7 +43,8 @@ static void print_ipv4_info(const struct rte_ipv4_hdr *ipv4) {
     printf("IPv4: %s -> %s, proto=%u, ttl=%u\n", src, dst, ipv4->next_proto_id, ipv4->time_to_live);
 }
 
-static void print_ipv6_info(const struct rte_ipv6_hdr *ipv6) {
+static void print_ipv6_info(const struct rte_ipv6_hdr *ipv6)
+{
     char src[INET6_ADDRSTRLEN] = {0};
     char dst[INET6_ADDRSTRLEN] = {0};
     inet_ntop(AF_INET6, ipv6->src_addr.a, src, sizeof(src));
@@ -48,7 +52,8 @@ static void print_ipv6_info(const struct rte_ipv6_hdr *ipv6) {
     printf("IPv6: %s -> %s, next-header=%u, hop-limit=%u\n", src, dst, ipv6->proto, ipv6->hop_limits);
 }
 
-static void print_arp_info(const struct rte_arp_hdr *arp) {
+static void print_arp_info(const struct rte_arp_hdr *arp)
+{
     char sip[INET_ADDRSTRLEN] = {0};
     char tip[INET_ADDRSTRLEN] = {0};
     inet_ntop(AF_INET, &arp->arp_data.arp_sip, sip, sizeof(sip));
@@ -56,7 +61,8 @@ static void print_arp_info(const struct rte_arp_hdr *arp) {
     printf("ARP: op=%u, %s -> %s\n", rte_be_to_cpu_16(arp->arp_opcode), sip, tip);
 }
 
-static void inspect_packet(struct rte_mbuf *m) {
+static void inspect_packet(struct rte_mbuf *m)
+{
     struct rte_ether_hdr *eth = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
     uint16_t ether_type = rte_be_to_cpu_16(eth->ether_type);
 
@@ -64,28 +70,27 @@ static void inspect_packet(struct rte_mbuf *m) {
     print_ether_type(ether_type);
 
     if (ether_type == RTE_ETHER_TYPE_IPV4) {
-        const struct rte_ipv4_hdr *ipv4 =
-            rte_pktmbuf_mtod_offset(m, const struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
+        const struct rte_ipv4_hdr *ipv4 = rte_pktmbuf_mtod_offset(m, const struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
         print_ipv4_info(ipv4);
     } else if (ether_type == RTE_ETHER_TYPE_IPV6) {
-        const struct rte_ipv6_hdr *ipv6 =
-            rte_pktmbuf_mtod_offset(m, const struct rte_ipv6_hdr *, sizeof(struct rte_ether_hdr));
+        const struct rte_ipv6_hdr *ipv6 = rte_pktmbuf_mtod_offset(m, const struct rte_ipv6_hdr *, sizeof(struct rte_ether_hdr));
         print_ipv6_info(ipv6);
     } else if (ether_type == RTE_ETHER_TYPE_ARP) {
-        const struct rte_arp_hdr *arp =
-            rte_pktmbuf_mtod_offset(m, const struct rte_arp_hdr *, sizeof(struct rte_ether_hdr));
+        const struct rte_arp_hdr *arp = rte_pktmbuf_mtod_offset(m, const struct rte_arp_hdr *, sizeof(struct rte_ether_hdr));
         print_arp_info(arp);
     }
 
     printf("----\n");
 }
 
-struct worker_ctx {
+struct worker_ctx
+{
     uint16_t queue_id;
     uint16_t nb_ports;
 };
 
-static int worker_loop(void *arg) {
+static int worker_loop(void *arg)
+{
     struct worker_ctx *ctx = (struct worker_ctx *)arg;
     uint16_t qid = ctx->queue_id;
     uint16_t nb_ports = ctx->nb_ports;
@@ -103,7 +108,8 @@ static int worker_loop(void *arg) {
     return 0;
 }
 
-static int init_port(uint16_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q, struct rte_mempool *pool) {
+static int init_port(uint16_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q, struct rte_mempool *pool)
+{
     struct rte_eth_conf port_conf = {
         .rxmode = {.mq_mode = RTE_ETH_MQ_RX_NONE},
         .txmode = {.mq_mode = RTE_ETH_MQ_TX_NONE},
@@ -144,6 +150,7 @@ static int init_port(uint16_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q, struc
     if (ret != 0)
         return ret;
 
+    // 启用混杂模式, 接收所有流量
     ret = rte_eth_promiscuous_enable(port_id);
     if (ret != 0)
         return ret;
@@ -156,7 +163,9 @@ static int init_port(uint16_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q, struc
     return 0;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
+    // 初始化 EAL，解析命令行参数
     int ret = rte_eal_init(argc, argv);
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "EAL init failed\n");
@@ -174,14 +183,14 @@ int main(int argc, char **argv) {
     if (nb_ports == 0)
         rte_exit(EXIT_FAILURE, "No Ethernet ports\n");
 
-    struct rte_mempool *pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports * workers,
-                                                       MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE,
-                                                       rte_socket_id());
+    struct rte_mempool *pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports * workers, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     if (pool == NULL)
         rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 
     uint16_t port_id;
-    RTE_ETH_FOREACH_DEV(port_id) {
+    RTE_ETH_FOREACH_DEV(port_id)
+    {
+        // 初始化端口, 端口的收发队列数量等于lcore数量，确保每个lcore都有一个队列
         ret = init_port(port_id, workers, workers, pool);
         if (ret != 0)
             rte_exit(EXIT_FAILURE, "Port %u init failed: %d\n", port_id, ret);
@@ -192,7 +201,8 @@ int main(int argc, char **argv) {
 
     /* assign first 'workers' lcores (including master) to queues 0..workers-1 */
     unsigned lcore_id;
-    RTE_LCORE_FOREACH(lcore_id) {
+    RTE_LCORE_FOREACH(lcore_id)
+    {
         ctxs[idx].queue_id = idx;
         ctxs[idx].nb_ports = nb_ports;
         if (lcore_id == rte_get_main_lcore()) {
@@ -213,7 +223,8 @@ int main(int argc, char **argv) {
 
     rte_eal_mp_wait_lcore();
 
-    RTE_ETH_FOREACH_DEV(port_id) {
+    RTE_ETH_FOREACH_DEV(port_id)
+    {
         rte_eth_dev_stop(port_id);
         rte_eth_dev_close(port_id);
     }

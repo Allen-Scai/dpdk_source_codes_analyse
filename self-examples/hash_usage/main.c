@@ -15,7 +15,8 @@
 #include <sys/types.h>
 #include <time.h>
 
-static void fill_flow_key_content(flow_key_t *key, char *srcip, char *dstip, uint16_t src_port, uint16_t dst_port, uint8_t prototol) {
+static void fill_flow_key_content(flow_key_t *key, char *srcip, char *dstip, uint16_t src_port, uint16_t dst_port, uint8_t prototol)
+{
     if (!key) {
         return;
     }
@@ -46,7 +47,8 @@ struct rte_hash_parameters flow_hash_tbl_params = {
 
 #define TCP_PROTOCOL_NUMBER 6
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     int ret = 0;
     struct rte_hash *flow_hash_table = NULL;
     flow_key_t flow_key = {0};
