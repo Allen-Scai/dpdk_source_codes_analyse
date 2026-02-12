@@ -10,9 +10,12 @@
 CC ?= gcc
 PKGCONFIG ?= pkg-config
 
-TARGET ?= capture_packet
+# 构建目录
+BUILD_DIR ?= build
+
+TARGET ?= $(BUILD_DIR)/capture_packet
 SRCS := main.c
-OBJS := $(SRCS:.c=.o)
+OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS))
 
 # 从 pkg-config 获取 DPDK 编译/链接参数（若不可用，则为空）
 DPDK_CFLAGS := $(shell $(PKGCONFIG) --cflags libdpdk 2>/dev/null)
@@ -32,14 +35,23 @@ LDFLAGS := $(DPDK_LIBS) $(PQOS_LIBS) $(EXTRA_LIBS)
 .PHONY: all clean distclean
 all: $(TARGET)
 
-$(TARGET): $(OBJS)
+# 创建构建目录
+$(BUILD_DIR):
+	@mkdir -p $@
+
+# 构建可执行文件
+$(TARGET): $(OBJS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-%.o: %.c
+# 构建目标文件
+$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+# 清理构建文件
 clean:
-	rm -f $(OBJS) $(TARGET)
+	@if [ -d "$(BUILD_DIR)" ]; then \
+		rm -rf $(BUILD_DIR); \
+	fi
 
 # 完全清理（可能不常用）
 distclean: clean
